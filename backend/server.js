@@ -17,6 +17,19 @@ dotenv.config();
 
 const app = express();
 
+
+// ==========================================
+// AI SERVICE URL
+// ==========================================
+
+const AI_SERVICE_URL =
+  process.env.AI_SERVICE_URL || "http://localhost:8000";
+
+
+// ==========================================
+// MIDDLEWARE
+// ==========================================
+
 app.use(cors());
 app.use(express.json());
 
@@ -43,10 +56,13 @@ mongoose
 // ==========================================
 
 app.get("/", (req, res) => {
+
   res.json({
     message: "KaushalTrack Backend is running!",
-    status: "success"
+    status: "success",
+    aiService: AI_SERVICE_URL
   });
+
 });
 
 
@@ -133,6 +149,7 @@ app.post("/api/predict-risk", async (req, res) => {
       assessment
     } = req.body;
 
+
     if (
       attendance === undefined ||
       assessment === undefined
@@ -145,19 +162,27 @@ app.post("/api/predict-risk", async (req, res) => {
 
     }
 
+
     const response = await axios.post(
-      "http://localhost:8000/predict",
+      `${AI_SERVICE_URL}/predict`,
       {
         attendance: Number(attendance),
         assessment: Number(assessment)
       }
     );
 
+
     res.json({
-      risk: response.data.risk,
-      confidence: response.data.confidence,
+
+      risk:
+        response.data.risk,
+
+      confidence:
+        response.data.confidence,
+
       recommendedAction:
         response.data.recommendedAction
+
     });
 
   } catch (error) {
@@ -168,9 +193,13 @@ app.post("/api/predict-risk", async (req, res) => {
     );
 
     res.status(500).json({
+
       message:
         "AI Risk Engine is unavailable",
-      error: error.message
+
+      error:
+        error.message
+
     });
 
   }
@@ -212,8 +241,10 @@ app.post("/api/trainees", async (req, res) => {
     ) {
 
       return res.status(400).json({
+
         message:
           "Please provide all required trainee details"
+
       });
 
     }
@@ -232,8 +263,10 @@ app.post("/api/trainees", async (req, res) => {
     ) {
 
       return res.status(400).json({
+
         message:
           "Attendance and assessment must be numbers"
+
       });
 
     }
@@ -245,8 +278,10 @@ app.post("/api/trainees", async (req, res) => {
     ) {
 
       return res.status(400).json({
+
         message:
           "Attendance must be between 0 and 100"
+
       });
 
     }
@@ -258,22 +293,27 @@ app.post("/api/trainees", async (req, res) => {
     ) {
 
       return res.status(400).json({
+
         message:
           "Assessment must be between 0 and 100"
+
       });
 
     }
 
 
     // ------------------------------------------
-    // CALL AI SERVICE
+    // CALL DEPLOYED AI SERVICE
     // ------------------------------------------
 
     const aiResponse = await axios.post(
-      "http://localhost:8000/predict",
+      `${AI_SERVICE_URL}/predict`,
       {
-        attendance: attendanceNumber,
-        assessment: assessmentNumber
+        attendance:
+          attendanceNumber,
+
+        assessment:
+          assessmentNumber
       }
     );
 
@@ -310,11 +350,14 @@ app.post("/api/trainees", async (req, res) => {
 
     const trainee = new Trainee({
 
-      id: newId,
+      id:
+        newId,
 
-      name: name,
+      name:
+        name,
 
-      program: program,
+      program:
+        program,
 
       attendance:
         attendanceNumber,
@@ -322,7 +365,8 @@ app.post("/api/trainees", async (req, res) => {
       assessment:
         assessmentNumber,
 
-      status: status,
+      status:
+        status,
 
       company:
         company || "",
@@ -345,7 +389,8 @@ app.post("/api/trainees", async (req, res) => {
       recommendedAction:
         recommendedAction,
 
-      outcomeHistory: []
+      outcomeHistory:
+        []
 
     });
 
@@ -366,7 +411,8 @@ app.post("/api/trainees", async (req, res) => {
       message:
         "Trainee added successfully",
 
-      trainee: trainee,
+      trainee:
+        trainee,
 
       aiPrediction: {
 
@@ -406,14 +452,16 @@ app.post("/api/trainees", async (req, res) => {
 
 
 // ==========================================
-// DELETE TRAINEE
+// UPDATE TRAINEE
 // ==========================================
 
-app.delete("/api/trainees/:id", async (req, res) => {
+app.put("/api/trainees/:id", async (req, res) => {
 
   try {
 
-    const traineeId = Number(req.params.id);
+    const traineeId =
+      Number(req.params.id);
+
 
     if (isNaN(traineeId)) {
 
@@ -424,16 +472,104 @@ app.delete("/api/trainees/:id", async (req, res) => {
     }
 
 
+    const updatedTrainee =
+      await Trainee.findOneAndUpdate(
+
+        {
+          id: traineeId
+        },
+
+        req.body,
+
+        {
+          new: true,
+          runValidators: true
+        }
+
+      );
+
+
+    if (!updatedTrainee) {
+
+      return res.status(404).json({
+        message: "Trainee not found"
+      });
+
+    }
+
+
+    res.json({
+
+      message:
+        "Trainee updated successfully",
+
+      trainee:
+        updatedTrainee
+
+    });
+
+  } catch (error) {
+
+    console.error(
+      "Error updating trainee:",
+      error
+    );
+
+    res.status(500).json({
+
+      message:
+        "Failed to update trainee",
+
+      error:
+        error.message
+
+    });
+
+  }
+
+});
+
+
+// ==========================================
+// DELETE TRAINEE
+// ==========================================
+
+app.delete("/api/trainees/:id", async (req, res) => {
+
+  try {
+
+    const traineeId =
+      Number(req.params.id);
+
+
+    if (isNaN(traineeId)) {
+
+      return res.status(400).json({
+
+        message:
+          "Invalid trainee ID"
+
+      });
+
+    }
+
+
     const deletedTrainee =
       await Trainee.findOneAndDelete({
-        id: traineeId
+
+        id:
+          traineeId
+
       });
 
 
     if (!deletedTrainee) {
 
       return res.status(404).json({
-        message: "Trainee not found"
+
+        message:
+          "Trainee not found"
+
       });
 
     }
@@ -499,8 +635,10 @@ app.post(
       if (!status) {
 
         return res.status(400).json({
+
           message:
             "Outcome status is required"
+
         });
 
       }
@@ -512,15 +650,20 @@ app.post(
 
       const trainee =
         await Trainee.findOne({
-          id: Number(req.params.id)
+
+          id:
+            Number(req.params.id)
+
         });
 
 
       if (!trainee) {
 
         return res.status(404).json({
+
           message:
             "Trainee not found"
+
         });
 
       }
@@ -532,7 +675,9 @@ app.post(
 
       const finalCheckInDate =
         checkInDate ||
-        new Date().toISOString().split("T")[0];
+        new Date()
+          .toISOString()
+          .split("T")[0];
 
 
       // ------------------------------------------
@@ -540,8 +685,11 @@ app.post(
       // ------------------------------------------
 
       if (!trainee.outcomeHistory) {
+
         trainee.outcomeHistory = [];
+
       }
+
 
       trainee.outcomeHistory.push({
 
@@ -576,14 +724,24 @@ app.post(
       trainee.status =
         status;
 
+
       trainee.company =
-        company || trainee.company || "";
+        company ||
+        trainee.company ||
+        "";
+
 
       trainee.sector =
-        sector || trainee.sector || "";
+        sector ||
+        trainee.sector ||
+        "";
+
 
       trainee.salary =
-        salary || trainee.salary || "";
+        salary ||
+        trainee.salary ||
+        "";
+
 
       trainee.employmentDate =
         employmentDate ||
@@ -652,15 +810,20 @@ app.get(
 
       const trainee =
         await Trainee.findOne({
-          id: Number(req.params.id)
+
+          id:
+            Number(req.params.id)
+
         });
 
 
       if (!trainee) {
 
         return res.status(404).json({
+
           message:
             "Trainee not found"
+
         });
 
       }
@@ -725,14 +888,23 @@ app.post(
 
         const aiResponse =
           await axios.post(
-            "http://localhost:8000/predict",
+
+            `${AI_SERVICE_URL}/predict`,
+
             {
+
               attendance:
-                Number(trainee.attendance),
+                Number(
+                  trainee.attendance
+                ),
 
               assessment:
-                Number(trainee.assessment)
+                Number(
+                  trainee.assessment
+                )
+
             }
+
           );
 
 
@@ -823,6 +995,7 @@ app.get(
 
       const alerts =
         trainees
+
           .filter((trainee) => {
 
             return (
@@ -831,6 +1004,7 @@ app.get(
             );
 
           })
+
           .map((trainee) => {
 
             let priority =
@@ -862,7 +1036,9 @@ app.get(
             // --------------------------------------
 
             if (
-              Number(trainee.attendance) < 60
+              Number(
+                trainee.attendance
+              ) < 60
             ) {
 
               priority =
@@ -879,7 +1055,9 @@ app.get(
             // --------------------------------------
 
             else if (
-              Number(trainee.assessment) < 50
+              Number(
+                trainee.assessment
+              ) < 50
             ) {
 
               if (
@@ -945,15 +1123,19 @@ app.get(
 
       const highPriority =
         alerts.filter(
+
           (alert) =>
             alert.priority === "High"
+
         ).length;
 
 
       const mediumPriority =
         alerts.filter(
+
           (alert) =>
             alert.priority === "Medium"
+
         ).length;
 
 
@@ -1001,6 +1183,22 @@ app.get(
 
 
 // ==========================================
+// 404 HANDLER
+// ==========================================
+
+app.use((req, res) => {
+
+  res.status(404).json({
+
+    message:
+      "API endpoint not found"
+
+  });
+
+});
+
+
+// ==========================================
 // SERVER
 // ==========================================
 
@@ -1035,7 +1233,7 @@ app.listen(
     );
 
     console.log(
-      "AI Service: http://localhost:8000"
+      `AI Service: ${AI_SERVICE_URL}`
     );
 
     console.log(
@@ -1048,6 +1246,10 @@ app.listen(
 
     console.log(
       "Delete Trainee API: Enabled"
+    );
+
+    console.log(
+      "Update Trainee API: Enabled"
     );
 
     console.log(
